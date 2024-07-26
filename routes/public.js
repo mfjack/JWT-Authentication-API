@@ -1,11 +1,14 @@
 import express from 'express'
 import bcrypt from 'bcrypt'
 import { PrismaClient } from '@prisma/client'
+import jwt from 'jsonwebtoken'
 
 const prisma = new PrismaClient()
 const router = express.Router()
 
-// Cadastrar um novo usuário
+const JWT_SECRET = process.env.JWT_SECRET
+
+// Cadastrar um novo usuário.
 router.post('/register', async (req, res) => {
     try {
         const user = req.body
@@ -17,20 +20,42 @@ router.post('/register', async (req, res) => {
                 name: user.name,
                 email: user.email,
                 password: hashPassword
-                // OBS: O retorno da senha é por fim didático.
+                // OBS: O retorno da senha é para fins didático.
             }
         })
         res.status(201).json(userDB)
     } catch (err) {
-        res.status(500).json('Erro no servidor')
+        res.status(500).json({ message: 'Erro no servidor' })
     }
 })
 
+// Login do usuário.
 router.post('/login', async (req, res) => {
     try {
+        const userInfo = req.body
 
+        // Busca o usuário no banco de dados.
+        const user = await prisma.user.findUnique({
+            where: {
+                email: userInfo.email
+            }
+        })
+
+        // Verifica se o usuário existe no banco de dados.
+        if (!user) {
+            return res.status(404).json({ message: 'Usuário não encontrado' })
+        }
+
+        // Verifica se a senha confere com a senha do usuário no banco de dados.
+        const isMatch = await bcrypt.compare(userInfo.password, user.password)
+
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Credenciais inválidas' })
+        }
+
+        res.status(200).json(user)
     } catch (err) {
-
+        res.status(500).json({ message: 'Erro no servidor' })
     }
 })
 
